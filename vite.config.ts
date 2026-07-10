@@ -24,6 +24,12 @@ export default defineConfig(({ mode }) => {
     hmr: {
       overlay: false,
     },
+    // 仅开发服务器使用；生产构建为纯静态产物，不依赖此配置。
+    // 只信任 v0 预览代理域与显式配置的 Host，禁止 allowedHosts: true（DNS rebinding 风险）。
+    allowedHosts: [
+      ".vusercontent.net", // v0 预览代理（前导点 = 仅该域及其子域，不是放开 TLD）
+      ...(env.STAGEOS_ALLOWED_HOSTS ? env.STAGEOS_ALLOWED_HOSTS.split(",").map((h) => h.trim()) : []),
+    ],
   },
   plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
   resolve: {
