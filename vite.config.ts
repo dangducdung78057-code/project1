@@ -6,15 +6,16 @@ import { componentTagger } from "lovable-tagger";
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
   // Load all env vars (no prefix filter) so the Vercel/v0 Supabase integration vars are visible here
-  const env = { ...loadEnv(mode, process.cwd(), ""), ...process.env };
+  const fileEnv = loadEnv(mode, process.cwd(), "");
+  const env = { ...fileEnv, ...process.env };
   return {
   define: {
-    // Map v0/Vercel Supabase integration env vars to the VITE_ vars the app expects
+    // STAGEOS_* 专用变量优先（写在 .env 里，不会被集成同步的旧项目变量覆盖）
     "import.meta.env.VITE_SUPABASE_URL": JSON.stringify(
-      env.VITE_SUPABASE_URL ?? env.SUPABASE_URL ?? env.NEXT_PUBLIC_SUPABASE_URL ?? "",
+      fileEnv.STAGEOS_SUPABASE_URL ?? env.VITE_SUPABASE_URL ?? env.SUPABASE_URL ?? env.NEXT_PUBLIC_SUPABASE_URL ?? "",
     ),
     "import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY": JSON.stringify(
-      env.VITE_SUPABASE_PUBLISHABLE_KEY ?? env.SUPABASE_ANON_KEY ?? env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "",
+      fileEnv.STAGEOS_SUPABASE_ANON_KEY ?? env.VITE_SUPABASE_PUBLISHABLE_KEY ?? env.SUPABASE_ANON_KEY ?? env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "",
     ),
   },
   server: {
