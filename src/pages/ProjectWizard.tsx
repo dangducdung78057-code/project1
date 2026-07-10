@@ -398,7 +398,7 @@ export default function ProjectWizard() {
       }
       localStorage.removeItem(LEGACY_KEY);
 
-      toast.success("项目已创建，本地规则方案已生成");
+      toast.success("项目已创建，本地规则方案���生成");
       navigate(`/projects/${projectId}`);
     } catch (e: any) {
       toast.error("提交失败:" + e.message);
@@ -953,7 +953,7 @@ export default function ProjectWizard() {
                             key={p.name}
                             type="button"
                             className="flex items-center gap-2 rounded border border-border px-2 py-1.5 text-xs hover:bg-accent"
-                            title={`${p.note} 主色 ${p.primary} ${p.primaryHex} / 辅色 ${p.secondary} ${p.secondaryHex} / 点缀 ${p.accent} ${p.accentHex}`}
+                            title={`${p.note} 主色 ${p.primary} ${p.primaryHex} / ���色 ${p.secondary} ${p.secondaryHex} / 点缀 ${p.accent} ${p.accentHex}`}
                             onClick={() => {
                               set("screenThemeColor", `${p.primary} ${p.primaryHex}`);
                               toast.success(`已套用配色「${p.name}」主色 ${p.primary} ${p.primaryHex}`);
@@ -1176,7 +1176,7 @@ function CountsHint({ data }: { data: StageInputData }) {
   return (
     <div className={`text-xs ${ok ? "text-success" : "text-warning"} flex items-center gap-1`}>
       {ok ? <Check className="h-3.5 w-3.5" /> : <AlertTriangle className="h-3.5 w-3.5" />}
-      男({maleCount}) + 女({femaleCount}) = {sum} {ok ? "= " : "≠ "} 总人��({performerCount})
+      男({maleCount}) + 女({femaleCount}) = {sum} {ok ? "= " : "≠ "} 总人数({performerCount})
     </div>
   );
 }

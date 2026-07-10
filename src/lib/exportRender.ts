@@ -252,9 +252,9 @@ export function renderMarkdown(
       procurementSectionMd(procurement),
       "",
       "---",
-      "## mock / 非真实库存价格声明",
+      "## 估算与非真实库存价格声明",
       "",
-      "本导出所含所有价格、库存、供货商与平台链接均为 mock 或搜索建议，需人工核验，不构成采购承诺。",
+      "本导出所含所有价格、库存、供货商与平台链接均为模拟估算或搜索建议，需人工核验，不构成采购承诺。",
       "",
       "## 隐私声明摘要",
       "",
@@ -290,7 +290,7 @@ export function renderMarkdown(
     section("倒排时间表", scheduleTableMd(doc.schedule)),
     section("采购搜索建议", searchListMd(doc.search)),
     procurementSectionMd(doc.procurementCandidates),
-    section("mock / 非真实库存价格声明", "本导出所含所有价格、库存、供货商与平台链接均为 mock 或搜索建议，需人工核验，不构成采购承诺。"),
+    section("估算与非真实库存价格声明", "本导出所含所有价格、库存、供货商与平台链接均为模拟估算或搜索建议，需人工核验，不构成采购承诺。"),
     section("隐私声明摘要", "本文件仅包含匿名 studentId、性别、身高、可选角色标签；不含真实姓名或联系方式。"),
     `\n---\n\n<sub>${watermarkLine()}</sub>\n`,
   ].join("\n");
@@ -564,9 +564,9 @@ export function renderPrintableHtml(
 </head>
 <body>
 <article class="stageos-print-doc" data-project-title="${escapeHtml(title)}">
-  <div class="doc-kicker">StageOS Costume Master Plan · mock operations export</div>
+  <div class="doc-kicker">StageOS Costume Master Plan · operations export</div>
   <h1>StageOS 服装总表导出 · ${escapeHtml(title)}</h1>
-  <div class="notice">mock 模式说明：当前 v2 使用规则化 mock 生成，所有商品、库存、价格与平台结果均需人工核验，不代表真实采购承诺。</div>
+  <div class="notice">估算模式说明：本表由规则引擎/AI 模拟生成，所有商品、库存、价格与平台结果均需人工核验，不代表真实采购承诺。</div>
   <section aria-label="项目信息">
     <h2>项目信息</h2>
     <div class="meta-grid">
@@ -589,7 +589,7 @@ export function renderPrintableHtml(
   <section><h2>倒排时间表</h2>${scheduleTable(doc.schedule)}</section>
   <section><h2>采购搜索建议</h2>${searchTable(doc.search)}</section>
   ${procurementSectionHtml(doc.procurementCandidates)}
-  <section><h2>隐私与非真实库存/价格声明</h2><p>隐私声明：导出仅面向匿名学生数据、人数、身高分档和角色标签，不包含真实姓名、联系方式或敏感身份信息。</p><p>非真实库存/价格声明：本文件中的价格、SKU、库存、供应商和平台搜索建议均为 mock / 模拟或人工检索建议，需由采购负责人二次确认。</p></section>
+  <section><h2>隐私与非真实库存/价格声明</h2><p>隐私声明：导出仅面向匿名学生数据、人数、身高分档和角色标签，不包含真实姓名、联系方式或敏感身份信息。</p><p>非真实库存/价格声明：本文件中的价格、SKU、库存、供应商和平台搜索建议均为模拟估算或人工检索建议，需由采购负责人二次确认。</p></section>
   <div class="stageos-watermark" data-stageos-watermark>${escapeHtml(watermarkLine())}</div>
 </article>
 </body>
@@ -653,7 +653,7 @@ function buildPrintableDoc(data: any, rawPayload: unknown, format: string, meta:
   const maleCount = value(input.maleCount, input.male_count, project.maleCount, project.male_count, md.input?.maleCount, "—");
   const femaleCount = value(input.femaleCount, input.female_count, project.femaleCount, project.female_count, md.input?.femaleCount, "—");
   const budget = value(input.perPersonBudget, input.per_person_budget, project.budget, plan.budget, md.input?.perPersonBudget, "—");
-  const mode = value(snapshot.mode, data?.mode, md.snapshot?.mode, format === "json" ? "mock" : "markdown/mock", "mock");
+  const mode = value(snapshot.mode, data?.mode, md.snapshot?.mode, format === "json" ? "local_rules" : "markdown/local_rules", "local_rules");
   const risks = firstNonEmpty(arrayOf(data?.risks, snapshot?.risks, plan?.risks), md.risks);
   const planB = firstNonEmpty(arrayOf(data?.planB, data?.plan_b, plan?.planB, plan?.plan_b, snapshot?.planB, snapshot?.plan_b), md.planB);
   const purchaseStrategy = firstNonEmpty(arrayOf(plan?.purchaseStrategy, plan?.purchase_strategy, data?.purchaseStrategy, data?.purchase_strategy), md.purchaseStrategy);

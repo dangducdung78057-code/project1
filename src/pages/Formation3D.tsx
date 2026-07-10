@@ -1209,7 +1209,7 @@ function OcclusionPanel() {
 
 // ---------- 可嵌入编辑器 ----------
 
-/** 可嵌入的 3D 队形编辑器:放入任意 relative 容器��可,支持传入真实男���人数 */
+/** 可嵌入的 3D 队形编辑器:放入任意 relative 容器即可,支持传入真实男女人数 */
 export function Formation3DEditor({
   maleCount,
   femaleCount,
