@@ -23,13 +23,12 @@ export function useEntitlements(): ServerEntitlements & { isLoading: boolean } {
     enabled: Boolean(user),
     refetchOnWindowFocus: false,
     queryFn: async (): Promise<ServerEntitlements> => {
-      // user_entitlements 尚未纳入生成的 Supabase 类型，绕过表名字面量检查
-      const from = supabase.from as (table: string) => ReturnType<typeof supabase.from>;
+      // user_entitlements 尚未纳入生成的 Supabase 类型；用 bind 保留 this，避免方法剥离后丢失客户端实例
+      const from = (supabase.from as (table: string) => ReturnType<typeof supabase.from>).bind(supabase);
       const { data: row, error } = await from("user_entitlements")
         .select("tier, max_performers, expires_at")
         .eq("user_id", user!.id)
         .maybeSingle();
-      console.log("[v0] entitlements query:", { userId: user!.id, row, error: error?.message });
       if (error) return FALLBACK;
       // 无记录 = 服务端确认 free（fromServer: true，锁定前端档位）
       if (!row) return { ...FALLBACK, fromServer: true };

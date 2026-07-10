@@ -16,8 +16,8 @@ import {
   type ScheduleBuildInput,
 } from "@/domain/stageos/schedule";
 
-// schedule_tasks 尚未纳入生成的 Supabase 类型，绕过表名字面量检查
-const fromTable = (table: string) => (supabase.from as (t: string) => ReturnType<typeof supabase.from>)(table);
+// schedule_tasks 尚未纳入生成的 Supabase 类型；bind 保留 this，避免方法剥离丢失客户端实例
+const fromTable = (supabase.from as (t: string) => ReturnType<typeof supabase.from>).bind(supabase);
 
 const CATEGORY_COLORS: Record<string, string> = {
   策划: "bg-primary/80",
