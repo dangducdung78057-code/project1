@@ -11,6 +11,7 @@
     "prebuild:dev": "node scripts/verify-sitemap-robots.mjs",
     "verify:sitemap": "node scripts/verify-sitemap-robots.mjs",
     "lint": "eslint .",
+    "lint:new": "eslint src/domain src/features src/stores src/hooks/useEntitlements.ts src/components/MemberRoute.tsx src/App.tsx --max-warnings 0",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",

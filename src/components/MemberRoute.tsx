@@ -13,6 +13,7 @@ import { useEntitlements } from "@/hooks/useEntitlements";
 export function MemberRoute({ children }: { children: ReactNode }) {
   const { user, loading: authLoading } = useAuth();
   const ent = useEntitlements();
+  console.log(`[v0] MemberRoute: user=${user?.id?.slice(0, 8)} tier=${ent.tier} fromServer=${ent.fromServer} loading=${ent.isLoading}`);
 
   if (authLoading || ent.isLoading) {
     return (

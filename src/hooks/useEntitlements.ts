@@ -29,6 +29,7 @@ export function useEntitlements(): ServerEntitlements & { isLoading: boolean } {
         .select("tier, max_performers, expires_at")
         .eq("user_id", user!.id)
         .maybeSingle();
+      console.log("[v0] entitlements query:", { userId: user!.id, row, error: error?.message });
       if (error) return FALLBACK;
       // 无记录 = 服务端确认 free（fromServer: true，锁定前端档位）
       if (!row) return { ...FALLBACK, fromServer: true };

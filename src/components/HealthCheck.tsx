@@ -60,7 +60,7 @@ export function HealthCheck() {
       .limit(10);
     setRecent((data ?? []) as RunRow[]);
   }
-  useEffect(() => { void loadRecent(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [user?.id]);
+  useEffect(() => { void loadRecent();   }, [user?.id]);
 
   async function run() {
     setRunning(true);
@@ -778,7 +778,7 @@ export function HealthCheck() {
       toast.success("验收摘要已复制到剪贴板");
     } catch {
       toast.error("复制失败，请手动选择文本");
-      // eslint-disable-next-line no-console
+       
       console.log(text);
     }
   }

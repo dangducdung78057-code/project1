@@ -72,7 +72,7 @@ export default function ProjectEditor() {
 
   useEffect(() => {
     if (!debugHints) return;
-    // eslint-disable-next-line no-console
+     
     console.groupCollapsed(
       `[StageOS hints] errors=${errors.length} warnings=${warnings.length} unmatched=${unmatched.errors.length + unmatched.warnings.length}`,
     );
