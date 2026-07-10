@@ -4,17 +4,22 @@
 
 import { Client } from "pg";
 
-const BASE = "https://nrmsagzrtmofjoblurjp.supabase.co";
-const ANON = "sb_publishable_FzUu2qwzJWe2Q4n4NZu-qA_p6byWpdy"; // publishable key（公开安全）
+// 从环境变量读取，确保与被测项目一致（auth 建用户与 PG 查询必须同一个项目）
+const BASE = process.env.STAGEOS_SUPABASE_URL ?? process.env.VITE_SUPABASE_URL;
+const ANON = process.env.STAGEOS_SUPABASE_ANON_KEY ?? process.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 const PG_URL = process.env.STAGEOS_POSTGRES_URL;
+if (!BASE || !ANON) {
+  console.error("缺少 STAGEOS_SUPABASE_URL / STAGEOS_SUPABASE_ANON_KEY 环境变量");
+  process.exit(1);
+}
 if (!PG_URL) {
   console.error("缺少 STAGEOS_POSTGRES_URL 环境变量");
   process.exit(1);
 }
 
 const PASSWORD = "RlsAudit123!";
-const USER_A = "rls-audit-a@example.com";
-const USER_B = "rls-audit-b@example.com";
+const USER_A = "rls-audit-a@stageos-test.com";
+const USER_B = "rls-audit-b@stageos-test.com";
 
 let passed = 0;
 let failed = 0;
@@ -48,22 +53,39 @@ async function api(path, { method = "GET", token = ANON, body, headers = {} } = 
   return { status: res.status, json };
 }
 
-async function ensureUser(email) {
-  const login = await api("/auth/v1/token?grant_type=password", {
+async function login(email) {
+  const res = await api("/auth/v1/token?grant_type=password", {
     method: "POST",
     body: { email, password: PASSWORD },
   });
-  if (login.json?.access_token) return login.json;
-  const signup = await api("/auth/v1/signup", { method: "POST", body: { email, password: PASSWORD } });
-  if (signup.json?.access_token) return signup.json;
-  throw new Error(`无法登录/注册 ${email}: ${JSON.stringify(signup.json).slice(0, 120)}`);
+  if (res.json?.access_token) return res.json;
+  throw new Error(`无法登录 ${email}: ${JSON.stringify(res.json).slice(0, 120)}`);
+}
+
+// 直接在 auth.users 播种已确认的测试用户，绕过邮件确认与注册限流（使用 pgcrypto bcrypt）
+async function seedUser(pg, email) {
+  await pg.query("delete from auth.users where email = $1", [email]);
+  const { rows } = await pg.query(
+    `insert into auth.users (instance_id, id, aud, role, email, encrypted_password,
+        email_confirmed_at, created_at, updated_at, raw_app_meta_data, raw_user_meta_data,
+        confirmation_token, recovery_token, email_change_token_new, email_change)
+     values ('00000000-0000-0000-0000-000000000000', gen_random_uuid(), 'authenticated', 'authenticated',
+        $1, crypt($2, gen_salt('bf')), now(), now(), now(),
+        '{"provider":"email","providers":["email"]}', '{}',
+        '', '', '', '')
+     returning id`,
+    [email, PASSWORD],
+  );
+  return rows[0].id;
 }
 
 const pg = new Client({ connectionString: PG_URL, ssl: { rejectUnauthorized: false } });
 await pg.connect();
 
-const a = await ensureUser(USER_A);
-const b = await ensureUser(USER_B);
+await seedUser(pg, USER_A);
+await seedUser(pg, USER_B);
+const a = await login(USER_A);
+const b = await login(USER_B);
 const aId = a.user.id;
 const bId = b.user.id;
 
