@@ -1,22 +1,6 @@
 // StageOS domain constants and helpers
 export const STAGEOS_VERSION = "stageos-v4.1-webhook-signature" as const;
 
-/**
- * 排产快照生成模式的用户可见文案。
- * 历史快照中可能仍存有 "mock" 值，统一映射为「本地规则」。
- */
-export function planModeLabel(mode: string | null | undefined): string {
-  switch (mode) {
-    case "ai":
-      return "AI";
-    case "local_rules":
-    case "mock":
-      return "本地规则";
-    default:
-      return mode || "未知";
-  }
-}
-
 export const SCHOOL_STAGES = [
   { value: "primary", label: "小学" },
   { value: "junior", label: "初中" },

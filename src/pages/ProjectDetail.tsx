@@ -9,8 +9,7 @@ import {
   validateStageInput, validateStageInputDetailed, appendValidationHistory,
   type StageInputData, PROGRAM_TYPES, SCHOOL_STAGES, CONFIRMATION_STATUSES,
 } from "@/lib/stageos";
-import { generateLocalPlan } from "@/features/plan-engine/generateLocalPlan";
-import { planModeLabel } from "@/lib/stageos";
+import { generateMockPlan } from "@/lib/mockPlan";
 import { getFlag, useFlags } from "@/lib/featureFlags";
 import { toast } from "sonner";
 import {
@@ -178,9 +177,9 @@ export default function ProjectDetail() {
         return;
       }
 
-      // AI 生成 provider（feature flag，任何失败必须自动回退到本地规则引擎，绝不抛 Runtime Error）
+      // AI 生成 provider（feature flag，任何失败必须自动回退到 mock，绝不抛 Runtime Error）
       let costumePlan: any, risks: any, reverseSchedule: any, platformSearch: any;
-      let mode: "ai" | "local_rules" = "local_rules";
+      let mode: "ai" | "mock" = "mock";
       let providerStatus: string | null = null;
       const useAi = getFlag("aiProvider");
       const validateAiPlan = (p: any): string[] => {
@@ -218,26 +217,26 @@ export default function ProjectDetail() {
                 });
               }
             } else {
-              toast.warning("AI provider 不可用，已改用本地规则引擎生成。", { description: `缺少字段：${miss.join("、")}` });
+              toast.warning("AI provider 不可用，已使用 mock fallback。", { description: `缺少字段：${miss.join("、")}` });
               providerStatus = "fallback";
             }
           } else {
-            toast.warning("AI provider 不可用，已改用本地规则引擎生成。", {
+            toast.warning("AI provider 不可用，已使用 mock fallback。", {
               description: data?.code ?? res.error?.message ?? "AI 返回异常",
             });
             providerStatus = "fallback";
           }
         } catch (aiErr: any) {
-          toast.warning("AI provider 不可用，已改用本地规则引擎生成。", { description: aiErr?.message });
+          toast.warning("AI provider 不可用，已使用 mock fallback。", { description: aiErr?.message });
           providerStatus = "fallback";
         }
       }
-      if (mode === "local_rules") {
-        const local = generateLocalPlan(input);
-        costumePlan = local.costumePlan;
-        risks = local.risks;
-        reverseSchedule = local.reverseSchedule;
-        platformSearch = local.platformSearch;
+      if (mode === "mock") {
+        const mocked = generateMockPlan(input);
+        costumePlan = mocked.costumePlan;
+        risks = mocked.risks;
+        reverseSchedule = mocked.reverseSchedule;
+        platformSearch = mocked.platformSearch;
       }
       const nextVersion = (snapshots[0]?.version ?? 0) + 1;
       const { data: userData } = await supabase.auth.getUser();
@@ -250,7 +249,7 @@ export default function ProjectDetail() {
       } as any);
       if (error) throw error;
       await supabase.from("projects").update({ status: "planning" }).eq("id", project.id);
-      const label = mode === "ai" ? "AI" : providerStatus === "fallback" ? "本地规则 (AI 回退)" : "本地规则";
+      const label = mode === "ai" ? "AI" : providerStatus === "fallback" ? "mock (fallback)" : "mock";
       toast.success(`已生成 v${nextVersion} 服装总表(${label})`);
       setGenerationNotice(null);
       load();
@@ -374,10 +373,10 @@ export default function ProjectDetail() {
             size="sm"
             onClick={handleGenerate}
             disabled={busy}
-            title={hasPrivacyConfirmation ? (aiOn ? "生成 AI 排产（失败自动回退本地规则）" : "生成排产（本地规则引擎）") : "请先完成用户/隐私确认"}
+            title={hasPrivacyConfirmation ? (aiOn ? "生成 AI 排产（失败回退 mock）" : "生成 Mock 排产") : "请先完成用户/隐私确认"}
             className="w-full md:w-auto justify-center"
           >
-            <Sparkles className="h-4 w-4 mr-1" />{aiOn ? "生成 AI 排产" : "生成排产"}
+            <Sparkles className="h-4 w-4 mr-1" />{aiOn ? "生成 AI 排产" : "生成 Mock 排产"}
             {aiOn && <span className="ml-2 kbd-route whitespace-nowrap">AI</span>}
             {!hasPrivacyConfirmation && <span className="ml-2 kbd-route whitespace-nowrap">需确认</span>}
           </Button>
@@ -454,7 +453,7 @@ export default function ProjectDetail() {
           <h2 className="sr-only">服装总表工作区</h2>
           {!latest && (
             <div className="panel panel-body text-sm text-muted-foreground text-center py-10">
-              尚未生成排产。点击右上角 <b>生成排产</b>。<br />
+              尚未生成排产。点击右上角 <b>生成 Mock 排产</b>。<br />
               <span className="text-xs">流程:compile-prompt → costume-master-plan → gated-output → confirm → export</span>
             </div>
           )}
@@ -469,7 +468,7 @@ export default function ProjectDetail() {
                     {snapshots.map((s) => (
                       <tr key={s.id}>
                         <td className="font-mono">v{s.version}</td>
-                        <td><ToneBadge tone="info">{planModeLabel(s.mode)}</ToneBadge></td>
+                        <td><ToneBadge tone="info">{s.mode}</ToneBadge></td>
                         <td className="font-mono text-xs text-muted-foreground">{new Date(s.generated_at).toLocaleString("zh-CN", { hour12: false })}</td>
                         <td className="font-mono">¥ {s.costume_plan?.totalEstimate ?? "—"}</td>
                       </tr>
@@ -479,7 +478,7 @@ export default function ProjectDetail() {
               </div>
               <MobileCardList>
                 {snapshots.map((s) => (
-                  <MobileCard key={s.id} title={<span className="font-mono">v{s.version}</span>} right={<ToneBadge tone="info">{planModeLabel(s.mode)}</ToneBadge>}>
+                  <MobileCard key={s.id} title={<span className="font-mono">v{s.version}</span>} right={<ToneBadge tone="info">{s.mode}</ToneBadge>}>
                     <MobileField label="生成时间" value={new Date(s.generated_at).toLocaleString("zh-CN", { hour12: false })} mono />
                     <MobileField label="合计" value={`¥ ${s.costume_plan?.totalEstimate ?? "—"}`} mono />
                   </MobileCard>
@@ -500,7 +499,7 @@ export default function ProjectDetail() {
             </div>
             <div className="panel-body space-y-3">
               <div className="text-xs text-muted-foreground">
-                用户/隐私确认为生成排产的前置条件。未完成确认前无法生成排产。
+                用户/隐私确认为生成排产的前置条件。未完成确认前无法生成 Mock 排产。
               </div>
               <Textarea rows={3} placeholder="填写确认/修订备注(可选)…" value={notes} onChange={(e) => setNotes(e.target.value)} />
               <div className="flex gap-2 flex-wrap">
@@ -784,7 +783,7 @@ function PlanView({ snapshot, ctx, procurementOn }: { snapshot: Snapshot; ctx: M
       <div className="panel">
         <div className="panel-header">
           <h3 className="text-sm font-semibold">总额估算</h3>
-          <ToneBadge tone="muted">v{snapshot.version} · {planModeLabel(snapshot.mode)}</ToneBadge>
+          <ToneBadge tone="muted">v{snapshot.version} · {snapshot.mode}</ToneBadge>
         </div>
         <div className="panel-body flex items-baseline gap-3">
           <div className="text-2xl font-semibold tabular-nums">¥ {plan.totalEstimate?.toLocaleString?.() ?? plan.totalEstimate}</div>
