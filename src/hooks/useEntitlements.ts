@@ -23,15 +23,17 @@ export function useEntitlements(): ServerEntitlements & { isLoading: boolean } {
     enabled: Boolean(user),
     refetchOnWindowFocus: false,
     queryFn: async (): Promise<ServerEntitlements> => {
-      const { data: row, error } = await supabase
-        .from("user_entitlements" as any)
+      // user_entitlements 尚未纳入生成的 Supabase 类型，绕过表名字面量检查
+      const from = supabase.from as (table: string) => ReturnType<typeof supabase.from>;
+      const { data: row, error } = await from("user_entitlements")
         .select("tier, max_performers")
         .eq("user_id", user!.id)
         .maybeSingle();
       if (error || !row) return FALLBACK;
+      const r = row as unknown as { tier?: MembershipTier; max_performers?: number };
       return {
-        tier: ((row as any).tier ?? "free") as MembershipTier,
-        maxPerformers: (row as any).max_performers ?? 40,
+        tier: r.tier ?? "free",
+        maxPerformers: r.max_performers ?? 40,
         fromServer: true,
       };
     },

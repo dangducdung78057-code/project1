@@ -12,11 +12,17 @@ import { useAuth } from "@/hooks/useAuth";
 import { useStageEditorStore } from "@/stores/useStageEditorStore";
 import { DotSketchCanvas } from "@/features/stage-editor/DotSketchCanvas";
 import { Stage25DViewport } from "@/features/stage-editor/Stage25DViewport";
-import { FORMATIONS } from "@/domain/stageos/formations";
+import { FORMATIONS, type FormationTemplateId } from "@/domain/stageos/formations";
 import { getEntitlements, canUsePreview } from "@/domain/stageos/entitlements";
 import { ReverseSchedulePanel } from "@/features/schedule/ReverseSchedulePanel";
 import { useEntitlements } from "@/hooks/useEntitlements";
-import type { MembershipTier, PreviewMode } from "@/domain/stageos/types";
+import type { MembershipTier, PreviewMode, Performer, StageConfiguration } from "@/domain/stageos/types";
+
+interface FormationSnapshotRow {
+  stage: StageConfiguration;
+  performers: Performer[];
+  template_id: FormationTemplateId | null;
+}
 
 function defaultPerformanceDate(): string {
   const d = new Date();
@@ -61,18 +67,19 @@ export default function StageEditor() {
   useEffect(() => {
     if (!user || loaded) return;
     (async () => {
-      const { data, error } = await supabase
-        .from("formation_snapshots" as any)
+      // formation_snapshots 尚未纳入生成的 Supabase 类型，这里手动声明行类型
+      const { data, error } = await (supabase.from as (table: string) => ReturnType<typeof supabase.from>)("formation_snapshots")
         .select("stage, performers, template_id")
         .eq("user_id", user.id)
         .order("updated_at", { ascending: false })
         .limit(1)
         .maybeSingle();
-      if (!error && data) {
+      const row = data as unknown as FormationSnapshotRow | null;
+      if (!error && row) {
         loadFormation({
-          stage: (data as any).stage,
-          performers: (data as any).performers,
-          activeTemplateId: (data as any).template_id ?? null,
+          stage: row.stage,
+          performers: row.performers,
+          activeTemplateId: row.template_id ?? null,
         });
         toast.info("已载入上次保存的队形");
       }
@@ -87,19 +94,19 @@ export default function StageEditor() {
     }
     setSaving(true);
     try {
-      const { error } = await supabase.from("formation_snapshots" as any).insert({
+      const { error } = await (supabase.from as (table: string) => ReturnType<typeof supabase.from>)("formation_snapshots").insert({
         user_id: user.id,
         title: stage.ledTitle || "未命名队形",
         preview_mode: previewMode,
         template_id: activeTemplateId,
-        stage: stage as any,
-        performers: performers as any,
+        stage: stage as unknown as Record<string, unknown>,
+        performers: performers as unknown as Record<string, unknown>[],
       });
       if (error) throw error;
       markSaved();
       toast.success("队形已保存到云端");
-    } catch (e: any) {
-      const msg: string = e?.message ?? "";
+    } catch (e: unknown) {
+      const msg: string = e instanceof Error ? e.message : "";
       if (msg.includes("ENTITLEMENT_DENIED")) {
         toast.error("服务端权益校验拒绝", { description: msg.replace(/^.*ENTITLEMENT_DENIED:\s*/, "") });
       } else {
