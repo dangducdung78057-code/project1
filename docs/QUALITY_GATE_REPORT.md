@@ -82,16 +82,40 @@ localStorage 用于：Supabase session（官方 SDK 标准行为）、UI 偏好�
 
 ## 七、工程质量命令（pnpm check 全链路，exit 0）
 
-`pnpm check` = `typecheck && lint && test && build`，各步真实输出摘要：
+`pnpm check` = `typecheck && lint && test && build`，最新一轮各步真实输出摘要：
 
 | 步骤 | 命令 | 真实结果 |
 |---|---|---|
 | typecheck | `tsc -b --pretty false` | 0 错误，无输出即通过 |
-| lint | `eslint .` | **0 errors**, 240 warnings（全部为旧页面 `any` 技术债 + 3 个可 autofix 的冗余 disable 指令） |
+| lint | `eslint .` | **0 errors**, 237 warnings（`--fix` 清掉 3 个冗余 disable 后，全部为旧页面 `any` 技术债） |
+| lint:new | `eslint <新代码目录> --max-warnings 0` | **0 errors / 0 warnings**（exit 0） |
 | test | `vitest run` | Test Files 10 passed (10)，Tests **100 passed (100)** |
-| build | `vite build` | ✓ built in 12.45s（chunk 大小提示为告警非错误） |
+| build | `vite build` | ✓ built in 13.49s（chunk 大小提示为告警非错误） |
 
 lint 说明：`no-explicit-any` 在新代码目录（`domain/stageos`、`features/`、`hooks/`、`stores/`）保持 error；迁移自原仓库的旧页面（`pages/`、`lib/`、`components/`、`supabase/functions/`）降级为 warn 作为技术债跟踪，非隐藏。生成物 `DEPLOY_BUNDLE.ts` 加入 ignore。
+
+旧技术债 warning 分布（Top）：`pages/ProjectDetail.tsx`、`pages/ProjectWizard.tsx`、`pages/ProjectEditor.tsx`、`lib/exportRender.ts`、`supabase/functions/*`（其余零散）。合计 237 条，全部为 `no-explicit-any`。
+
+## 七点五、收口轮补充验证（本轮真实执行）
+
+**Supabase 状态**：项目 nrmsagzrtmofjoblurjp 活跃（REST 200 / Auth healthy / PG pooler 连接成功），未处于 paused。若日后再暂停，从 Dashboard「Restore project」恢复即可，环境变量无需变更。
+
+**修复的关键 bug**：`supabase.from` 被剥离为独立函数后丢失 `this` 绑定（`Cannot read properties of undefined (reading 'rest')`），导致权益查询静默失败、会员被误判为 free。已在 `useEntitlements.ts` 与 `ReverseSchedulePanel.tsx` 用 `.bind(supabase)` 修复。
+
+**Blocked request 修复**：`vite.config.ts` 的 `server.allowedHosts` 只加 `.vusercontent.net`（v0 预览代理域及其子域）+ 可选 `STAGEOS_ALLOWED_HOSTS` 环境变量。未使用 `allowedHosts: true`，未放开顶级域；生产为纯静态构建，不依赖该配置。
+
+**Git 审计**：带哈希 JS 确认来自 `dist/`（曾被误提交 37 个文件），已 `git rm -r --cached dist` 移出索引，`.gitignore` 补入 `dist/`、`.vite/`、`*.tsbuildinfo`（`node_modules`、`.vercel` 原本已忽略），`git check-ignore` 验证生效。真实源码修改集中在 `src/`、`supabase/migrations/`、`scripts/`、配置文件。
+
+**真实冒烟测试（浏览器 + REST 双路）**：
+| 用例 | 结果 |
+|---|---|
+| 免费用户 B 直接访问 /formation-3d | 被拦截，显示"此功能需要会员档位" |
+| 会员用户 A 访问 /formation-3d | 正常进入 3D 编辑器（36 人 + 遮挡诊断） |
+| 用户 B 读 formation_snapshots | 返回 `[]`，看不到 A 的心形快照 |
+| 用户 B（free）REST 直写 stage-2.5d 快照 | `ENTITLEMENT_DENIED` 触发器拒绝 |
+| 用户 B 自改 tier 为 member | RLS 42501 拒绝 |
+| 队形保存后刷新 | 心形 36 人从云端恢复（前轮已验证） |
+| 修改演出日期重算 | schedule.test.ts 单测覆盖（100 通过含此项） |
 
 ## 八、最终交付清单
 
@@ -113,7 +137,7 @@ lint 说明：`no-explicit-any` 在新代码目录（`domain/stageos`、`feature
 **RLS 策略清单**：见第四节表格，9 类用户表全部 `auth.uid() = user_id`，`user_entitlements` 用户只读。
 
 **mock/占位清除情况**
-- 已清除冒充：AI 文案改为"本地规则引擎"；tier 切换器生产不可见
+- ���清除冒充：AI 文案改为"本地规则引擎"；tier 切换器生产不可见
 - 保留但明确标注：`mockPlan.ts`（引擎兜底样本）、采购演示数据（UI 有徽章）、2.5D 程序化占位资产（UI 有"占位资产"徽章）
 
 **仍未实现（不描述为可用）**
