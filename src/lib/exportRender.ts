@@ -56,7 +56,7 @@ export function localizeEnumsInText(text: string): string {
 export function slug(s: string | undefined | null, fallback = "project"): string {
   if (!s) return fallback;
   const cleaned = s
-    .replace(/[\s\/\\:*?"<>|]+/g, "-")
+    .replace(/[\s/\\:*?"<>|]+/g, "-")
     .replace(/-+/g, "-")
     .replace(/^-|-$/g, "")
     .trim();
@@ -788,7 +788,7 @@ function parseMarkdownPayload(raw: string): {
   // ## 倒排 → "- D-{days} {date} · {task} · {owner}"
   const schedBlock = extractListBlock(raw, /^##\s+倒排\s*$/m);
   for (const item of schedBlock) {
-    const m = /^D-(\d+)\s*([\d\-\/]+)?\s*·\s*(.+?)\s*·\s*(.+)$/.exec(item);
+    const m = /^D-(\d+)\s*([\d\-/]+)?\s*·\s*(.+?)\s*·\s*(.+)$/.exec(item);
     if (m) schedule.push({ daysBefore: Number(m[1]), date: m[2] || "", task: m[3], owner: m[4] });
     else schedule.push(item);
   }
