@@ -1,11 +1,13 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { CalendarDays, CheckCircle2, Circle, RefreshCw, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 import type { MembershipTier } from "@/domain/stageos/types";
 import {
   buildReverseSchedule,
@@ -13,6 +15,9 @@ import {
   type ReverseScheduleTask,
   type ScheduleBuildInput,
 } from "@/domain/stageos/schedule";
+
+// schedule_tasks 尚未纳入生成的 Supabase 类型，绕过表名字面量检查
+const fromTable = (table: string) => (supabase.from as (t: string) => ReturnType<typeof supabase.from>)(table);
 
 const CATEGORY_COLORS: Record<string, string> = {
   策划: "bg-primary/80",
@@ -36,6 +41,7 @@ type Props = {
 };
 
 export function ReverseSchedulePanel({ input, tier }: Props) {
+  const { user } = useAuth();
   const [tasks, setTasks] = useState<ReverseScheduleTask[]>(() => buildReverseSchedule(input, tier));
   const [view, setView] = useState<"list" | "gantt">("list");
   const isMember = tier !== "free";
@@ -49,12 +55,56 @@ export function ReverseSchedulePanel({ input, tier }: Props) {
     if (view === "gantt" && tier === "free") setView("list");
   }
 
+  // 登录后从云端恢复本演出日期下的完成状态（RLS 仅本人可读）
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    (async () => {
+      const { data, error } = await fromTable("schedule_tasks")
+        .select("task_key, completed")
+        .eq("user_id", user.id)
+        .eq("performance_date", input.performanceDate);
+      if (cancelled || error || !data) return;
+      const done = new Map((data as unknown as { task_key: string; completed: boolean }[]).map((r) => [r.task_key, r.completed]));
+      if (done.size > 0) {
+        setTasks((prev) => prev.map((t) => (done.has(t.title) ? { ...t, completed: done.get(t.title)! } : t)));
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user, input.performanceDate, lastKey]);
+
   const toggleTask = (id: string) => {
     if (!isMember) {
       toast.info("免费版倒排计划为只读清单，升级会员可勾选进度与自动重排。");
       return;
     }
-    setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, completed: !t.completed } : t)));
+    const target = tasks.find((t) => t.id === id);
+    if (!target) return;
+    const nextCompleted = !target.completed;
+    setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, completed: nextCompleted } : t)));
+
+    // 云端持久化（未登录仅本地生效）
+    if (user) {
+      void fromTable("schedule_tasks")
+        .upsert(
+          {
+            user_id: user.id,
+            performance_date: input.performanceDate,
+            task_key: target.title,
+            title: target.title,
+            due_date: target.dueDate,
+            completed: nextCompleted,
+            completed_at: nextCompleted ? new Date().toISOString() : null,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: "user_id,performance_date,task_key" },
+        )
+        .then(({ error }) => {
+          if (error) toast.error("进度同步失败", { description: error.message });
+        });
+    }
   };
 
   const handleReschedule = () => {

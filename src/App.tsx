@@ -18,10 +18,14 @@ import Modules from "./pages/Modules";
 import Exports from "./pages/Exports";
 import SettingsPage from "./pages/Settings";
 import AuthPage from "./pages/Auth";
-import Formation3D from "./pages/Formation3D";
 import StageEditor from "./pages/StageEditor";
 import NotFound from "./pages/NotFound";
 import ScrollToTop from "./components/ScrollToTop";
+import { MemberRoute } from "./components/MemberRoute";
+import { lazy, Suspense } from "react";
+
+// 3D 编辑器按需加载：免费用户不会提前下载 three.js 及会员资源
+const Formation3D = lazy(() => import("./pages/Formation3D"));
 
 const queryClient = new QueryClient();
 
@@ -38,7 +42,16 @@ const App = () => (
               <ScrollToTop />
               <Routes>
                 <Route path="/auth" element={<AuthPage />} />
-                <Route path="/formation-3d" element={<Formation3D />} />
+                <Route
+                  path="/formation-3d"
+                  element={
+                    <MemberRoute>
+                      <Suspense fallback={<div className="flex min-h-screen items-center justify-center text-sm text-muted-foreground">加载 3D 编辑器…</div>}>
+                        <Formation3D />
+                      </Suspense>
+                    </MemberRoute>
+                  }
+                />
                 <Route path="/stage-editor" element={<StageEditor />} />
                 <Route path="/index" element={<Navigate to="/" replace />} />
                 <Route

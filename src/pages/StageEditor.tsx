@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { Lock, Save, Download, ImageDown, Users, Loader2 } from "lucide-react";
@@ -11,7 +11,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useStageEditorStore } from "@/stores/useStageEditorStore";
 import { DotSketchCanvas } from "@/features/stage-editor/DotSketchCanvas";
-import { Stage25DViewport } from "@/features/stage-editor/Stage25DViewport";
+
+// 2.5D 视图按需加载：免费用户不会提前下载 pixi.js 与会员渲染资源
+const Stage25DViewport = lazy(() =>
+  import("@/features/stage-editor/Stage25DViewport").then((m) => ({ default: m.Stage25DViewport })),
+);
 import { FORMATIONS, type FormationTemplateId } from "@/domain/stageos/formations";
 import { getEntitlements, canUsePreview } from "@/domain/stageos/entitlements";
 import { ReverseSchedulePanel } from "@/features/schedule/ReverseSchedulePanel";
@@ -167,13 +171,19 @@ export default function StageEditor() {
               </TabsTrigger>
             </TabsList>
           </Tabs>
-          <Tabs value={tier} onValueChange={(v) => setTier(v as MembershipTier)}>
-            <TabsList aria-label="会员档位切换（开发预览）">
-              <TabsTrigger value="free">免费版</TabsTrigger>
-              <TabsTrigger value="member">会员版</TabsTrigger>
-              <TabsTrigger value="custom">定制版</TabsTrigger>
-            </TabsList>
-          </Tabs>
+          {import.meta.env.DEV ? (
+            <Tabs value={tier} onValueChange={(v) => setTier(v as MembershipTier)}>
+              <TabsList aria-label="会员档位切换（仅开发环境可见）">
+                <TabsTrigger value="free">免费版</TabsTrigger>
+                <TabsTrigger value="member">会员版</TabsTrigger>
+                <TabsTrigger value="custom">定制版</TabsTrigger>
+              </TabsList>
+            </Tabs>
+          ) : (
+            <Badge variant="secondary" aria-label="当前会员档位">
+              {tier === "free" ? "免费版" : tier === "member" ? "会员版" : "定制版"}
+            </Badge>
+          )}
         </div>
       </header>
 
@@ -278,10 +288,19 @@ export default function StageEditor() {
                 onChange={(e) => setLedTitle(e.target.value)}
                 className="h-8 max-w-xs"
               />
+              <Badge variant="outline" className="ml-auto text-[10px] whitespace-nowrap" title="当前人物与舞台为程序化绘制占位资产，正式素材接入后自动替换">
+                占位资产 · 程序化绘制
+              </Badge>
             </div>
           )}
           <div className="h-[560px]">
-            {previewMode === "stage-2.5d" ? <Stage25DViewport /> : <DotSketchCanvas />}
+            {previewMode === "stage-2.5d" ? (
+              <Suspense fallback={<div className="flex h-full items-center justify-center text-sm text-muted-foreground">加载 2.5D 舞台…</div>}>
+                <Stage25DViewport />
+              </Suspense>
+            ) : (
+              <DotSketchCanvas />
+            )}
           </div>
         </main>
       </div>

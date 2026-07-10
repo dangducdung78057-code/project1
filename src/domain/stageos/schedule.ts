@@ -89,11 +89,18 @@ const MEMBER_TASKS: TaskSeed[] = [
 export function buildReverseSchedule(input: ScheduleBuildInput, tier: MembershipTier): ReverseScheduleTask[] {
   const seeds = tier === "free" ? CORE_TASKS : [...CORE_TASKS, ...MEMBER_TASKS];
   const rehearsalBuffer = input.rehearsalFrequencyPerWeek < 3 ? 5 : input.performerCount > 60 ? 3 : 0;
+  // 大团队物流提前：人数 > 60 时，采购/服装到货类节点整体前移，避免尾期物流风险
+  const logisticsLead = input.performerCount > 60 ? 4 : 0;
 
   return seeds
     .map((task, index) => {
-      const adjustedDays =
-        task.category === "排练" || task.category === "走位" ? task.daysBefore + rehearsalBuffer : task.daysBefore;
+      const isRehearsal = task.category === "排练" || task.category === "走位";
+      const isLogistics = task.category === "采购" || task.category === "服装";
+      const adjustedDays = isRehearsal
+        ? task.daysBefore + rehearsalBuffer
+        : isLogistics
+          ? task.daysBefore + logisticsLead
+          : task.daysBefore;
       return {
         ...task,
         id: `schedule-${index + 1}`,

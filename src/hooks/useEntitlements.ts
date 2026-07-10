@@ -26,14 +26,18 @@ export function useEntitlements(): ServerEntitlements & { isLoading: boolean } {
       // user_entitlements 尚未纳入生成的 Supabase 类型，绕过表名字面量检查
       const from = supabase.from as (table: string) => ReturnType<typeof supabase.from>;
       const { data: row, error } = await from("user_entitlements")
-        .select("tier, max_performers")
+        .select("tier, max_performers, expires_at")
         .eq("user_id", user!.id)
         .maybeSingle();
-      if (error || !row) return FALLBACK;
-      const r = row as unknown as { tier?: MembershipTier; max_performers?: number };
+      if (error) return FALLBACK;
+      // 无记录 = 服务端确认 free（fromServer: true，锁定前端档位）
+      if (!row) return { ...FALLBACK, fromServer: true };
+      const r = row as unknown as { tier?: MembershipTier; max_performers?: number; expires_at?: string | null };
+      // 会员过期立即降级为 free（与服务端 get_user_tier 判定一致）
+      const expired = r.expires_at != null && new Date(r.expires_at).getTime() < Date.now();
       return {
-        tier: r.tier ?? "free",
-        maxPerformers: r.max_performers ?? 40,
+        tier: expired ? "free" : (r.tier ?? "free"),
+        maxPerformers: expired ? 40 : (r.max_performers ?? 40),
         fromServer: true,
       };
     },
