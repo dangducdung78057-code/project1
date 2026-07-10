@@ -32,6 +32,7 @@ export function verifySitemapRobots({ robotsText, sitemapText }) {
 
   const locs = [...sitemapText.matchAll(/<loc>\s*([^<\s]+)\s*<\/loc>/gi)].map((match) => match[1]);
   if (locs.length === 0) return fail("sitemap.xml 未包含任何 <loc> 条目。");
+  const mismatched = [];
   for (const loc of locs) {
     let url;
     try {
@@ -40,8 +41,15 @@ export function verifySitemapRobots({ robotsText, sitemapText }) {
       return fail(`sitemap.xml 中存在非法 URL：${loc}`);
     }
     if (url.origin !== robotsSitemap.origin) {
-      return fail(`sitemap.xml URL 与 robots.txt Sitemap 域名不一致：${loc}`);
+      mismatched.push(loc);
     }
+  }
+  if (mismatched.length > 0) {
+    return fail(
+      `sitemap.xml 中以下 URL 与 robots.txt Sitemap 域名 (${robotsSitemap.origin}) 不一致：\n${mismatched
+        .map((loc) => `  - ${loc}`)
+        .join("\n")}`,
+    );
   }
 
   return { ok: true, message: "", count: locs.length, origin: robotsSitemap.origin };
