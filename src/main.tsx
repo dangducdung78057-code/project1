@@ -22,9 +22,7 @@ function showBootFallback(message = "页面加载失败，请刷新或清除本�
       Object.keys(window.localStorage)
         .filter((key) => key.startsWith("sb-") || key.startsWith("stageos"))
         .forEach((key) => window.localStorage.removeItem(key));
-    } catch {
-      // localStorage 不可用（隐私模式等），直接跳转即可
-    }
+    } catch {}
     window.location.href = "/auth";
   });
 }
