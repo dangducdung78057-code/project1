@@ -14,7 +14,15 @@ import { DotSketchCanvas } from "@/features/stage-editor/DotSketchCanvas";
 import { Stage25DViewport } from "@/features/stage-editor/Stage25DViewport";
 import { FORMATIONS } from "@/domain/stageos/formations";
 import { getEntitlements, canUsePreview } from "@/domain/stageos/entitlements";
+import { ReverseSchedulePanel } from "@/features/schedule/ReverseSchedulePanel";
+import { useEntitlements } from "@/hooks/useEntitlements";
 import type { MembershipTier, PreviewMode } from "@/domain/stageos/types";
+
+function defaultPerformanceDate(): string {
+  const d = new Date();
+  d.setDate(d.getDate() + 45);
+  return d.toISOString().slice(0, 10);
+}
 
 export default function StageEditor() {
   const { user } = useAuth();
@@ -32,11 +40,18 @@ export default function StageEditor() {
   const [saving, setSaving] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [previewMode, setPreviewMode] = useState<PreviewMode>("dot-sketch");
+  const [performanceDate, setPerformanceDate] = useState<string>(defaultPerformanceDate);
 
   // 免费版切回黑点草图（前端权益门控；服务端校验在保存/导出时兜底）
   useEffect(() => {
     if (!canUsePreview(tier, previewMode)) setPreviewMode("dot-sketch");
   }, [tier, previewMode]);
+
+  // 登录后以服务端权益为准（user_entitlements 表，仅 service_role 可写）
+  const serverEnt = useEntitlements();
+  useEffect(() => {
+    if (serverEnt.fromServer) setTier(serverEnt.tier);
+  }, [serverEnt.fromServer, serverEnt.tier, setTier]);
 
   const ent = getEntitlements(tier);
   const visibleTemplates = FORMATIONS.filter((f) => !f.memberOnly || tier !== "free");
@@ -75,7 +90,7 @@ export default function StageEditor() {
       const { error } = await supabase.from("formation_snapshots" as any).insert({
         user_id: user.id,
         title: stage.ledTitle || "未命名队形",
-        preview_mode: "dot-sketch",
+        preview_mode: previewMode,
         template_id: activeTemplateId,
         stage: stage as any,
         performers: performers as any,
@@ -84,11 +99,16 @@ export default function StageEditor() {
       markSaved();
       toast.success("队形已保存到云端");
     } catch (e: any) {
-      toast.error("保存失败", { description: e?.message ?? "数据库暂不可用，请稍后重试" });
+      const msg: string = e?.message ?? "";
+      if (msg.includes("ENTITLEMENT_DENIED")) {
+        toast.error("服务端权益校验拒绝", { description: msg.replace(/^.*ENTITLEMENT_DENIED:\s*/, "") });
+      } else {
+        toast.error("保存失败", { description: msg || "数据库暂不可用，请稍后重试" });
+      }
     } finally {
       setSaving(false);
     }
-  }, [user, stage, performers, activeTemplateId, markSaved]);
+  }, [user, stage, performers, activeTemplateId, markSaved, previewMode]);
 
   const handleExportJson = useCallback(() => {
     const payload = {
@@ -222,6 +242,20 @@ export default function StageEditor() {
             </CardContent>
           </Card>
 
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm">演出日期</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Input
+                type="date"
+                value={performanceDate}
+                onChange={(e) => e.target.value && setPerformanceDate(e.target.value)}
+                aria-label="演出日期"
+              />
+            </CardContent>
+          </Card>
+
           <p className="text-[11px] leading-relaxed text-muted-foreground px-1">
             隐私说明：所有演员均使用匿名编号（S01…），本工具不采集姓名、照片等个人身份信息。数据仅保存在你自己的账号下。
           </p>
@@ -244,6 +278,15 @@ export default function StageEditor() {
           </div>
         </main>
       </div>
+
+      <ReverseSchedulePanel
+        input={{
+          performanceDate: performanceDate,
+          performerCount: performers.length,
+          rehearsalFrequencyPerWeek: 3,
+        }}
+        tier={tier}
+      />
     </div>
   );
 }
