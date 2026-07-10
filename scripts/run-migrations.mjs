@@ -11,11 +11,16 @@ import { resolve } from "node:path";
 import pg from "pg";
 
 function loadEnv() {
-  if (process.env.POSTGRES_URL_NON_POOLING) return process.env.POSTGRES_URL_NON_POOLING;
-  const envText = readFileSync(resolve(process.cwd(), ".env.development.local"), "utf8");
-  const match = envText.match(/^POSTGRES_URL_NON_POOLING="?([^"\n]+)"?$/m);
-  if (!match) throw new Error("POSTGRES_URL_NON_POOLING not found");
-  return match[1];
+  let url = process.env.POSTGRES_URL_NON_POOLING;
+  if (!url) {
+    const envText = readFileSync(resolve(process.cwd(), ".env.development.local"), "utf8");
+    const match = envText.match(/^POSTGRES_URL_NON_POOLING="?([^"\n]+)"?$/m);
+    if (!match) throw new Error("POSTGRES_URL_NON_POOLING not found");
+    url = match[1];
+  }
+  // Strip sslmode from the URL so it doesn't override our ssl config below
+  // (Supabase pooler uses a cert chain Node can't verify without the CA bundle).
+  return url.replace(/([?&])sslmode=[^&]*(&?)/, (_, p, amp) => (amp ? p : "")).replace(/[?&]$/, "");
 }
 
 async function main() {
