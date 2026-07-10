@@ -87,7 +87,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <span className="text-muted-foreground hidden sm:inline">/</span>
           <span className="font-medium truncate">运营工作台</span>
           <div className="ml-auto flex items-center gap-2 text-muted-foreground text-xs">
-            <span className="kbd-route hidden md:inline">mode: mock</span>
+            <span className="kbd-route hidden md:inline">engine: 本地规则</span>
             <span className="kbd-route hidden lg:inline">auth: enabled</span>
             <span className="hidden sm:inline font-mono truncate max-w-[160px]" title={user?.email ?? ""}>{user?.email}</span>
             <Button variant="ghost" size="sm" className="h-7 px-2" onClick={doSignOut} title="退出登录" aria-label="退出登录">

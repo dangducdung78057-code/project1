@@ -180,9 +180,9 @@ export default function SettingsPage() {
         <div className="panel-body grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
           <StatusRow ok label="auth" value="enabled" />
           <StatusRow ok label="database persistence" value="enabled" />
-          <StatusRow ok label="provider" value="mock" note />
+          <StatusRow ok label="provider" value="本地规则引擎" note />
           <StatusRow ok={false} label="payment" value="not connected" />
-          <StatusRow ok label="export" value="mock only" note />
+          <StatusRow ok label="export" value="本地渲染" note />
           <StatusRow ok label="row-level isolation" value="by user_id" />
           <div className="sm:col-span-2 border rounded px-2.5 py-1.5 bg-surface flex items-center justify-between">
             <span className="text-xs text-muted-foreground font-mono">version tag</span>
@@ -326,7 +326,7 @@ export default function SettingsPage() {
                 disabled={procProvider !== "http"}
                 onClick={() => { setProcHttpUrl(""); setHttpUrl(""); patchProcSettings({ procurementApiBaseUrl: "" }); toast.success("已清空 endpoint（下次将走 fallback-local）"); }}
               >
-                清空
+                ��空
               </button>
             </div>
             <p className="text-xs text-muted-foreground">
@@ -350,7 +350,7 @@ export default function SettingsPage() {
           <div className="space-y-1.5">
             <Label className="text-xs text-muted-foreground">apiMode</Label>
             <select className="h-9 w-full rounded border bg-background px-2 text-sm" value={apiMode} onChange={(e) => setApiMode(e.target.value)}>
-              <option value="mock">mock (默认,规则驱动)</option>
+              <option value="mock">本地规则引擎 (默认)</option>
               <option value="api">api (预留)</option>
             </select>
           </div>

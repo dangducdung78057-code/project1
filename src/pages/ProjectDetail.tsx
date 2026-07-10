@@ -9,7 +9,8 @@ import {
   validateStageInput, validateStageInputDetailed, appendValidationHistory,
   type StageInputData, PROGRAM_TYPES, SCHOOL_STAGES, CONFIRMATION_STATUSES,
 } from "@/lib/stageos";
-import { generateMockPlan } from "@/lib/mockPlan";
+import { generateLocalPlan } from "@/features/plan-engine/generateLocalPlan";
+import { formatPlanMode } from "@/lib/planMode";
 import { getFlag, useFlags } from "@/lib/featureFlags";
 import { toast } from "sonner";
 import {
@@ -177,9 +178,9 @@ export default function ProjectDetail() {
         return;
       }
 
-      // AI 生成 provider（feature flag，任何失败必须自动回退到 mock，绝不抛 Runtime Error）
+      // AI 生成 provider（feature flag，任何失败必须自动回退到本地规则引擎，绝不抛 Runtime Error）
       let costumePlan: any, risks: any, reverseSchedule: any, platformSearch: any;
-      let mode: "ai" | "mock" = "mock";
+      let mode: "ai" | "local" = "local";
       let providerStatus: string | null = null;
       const useAi = getFlag("aiProvider");
       const validateAiPlan = (p: any): string[] => {
@@ -217,26 +218,26 @@ export default function ProjectDetail() {
                 });
               }
             } else {
-              toast.warning("AI provider 不可用，已使用 mock fallback。", { description: `缺少字段：${miss.join("、")}` });
+              toast.warning("AI 引擎不可用，已使用本地规则引擎生成。", { description: `缺少字段：${miss.join("、")}` });
               providerStatus = "fallback";
             }
           } else {
-            toast.warning("AI provider 不可用，已使用 mock fallback。", {
+            toast.warning("AI 引擎不可用，已使用本地规则引擎生成。", {
               description: data?.code ?? res.error?.message ?? "AI 返回异常",
             });
             providerStatus = "fallback";
           }
         } catch (aiErr: any) {
-          toast.warning("AI provider 不可用，已使用 mock fallback。", { description: aiErr?.message });
+          toast.warning("AI 引擎不可用，已使用本地规则引擎生成。", { description: aiErr?.message });
           providerStatus = "fallback";
         }
       }
-      if (mode === "mock") {
-        const mocked = generateMockPlan(input);
-        costumePlan = mocked.costumePlan;
-        risks = mocked.risks;
-        reverseSchedule = mocked.reverseSchedule;
-        platformSearch = mocked.platformSearch;
+      if (mode === "local") {
+        const localPlan = generateLocalPlan(input);
+        costumePlan = localPlan.costumePlan;
+        risks = localPlan.risks;
+        reverseSchedule = localPlan.reverseSchedule;
+        platformSearch = localPlan.platformSearch;
       }
       const nextVersion = (snapshots[0]?.version ?? 0) + 1;
       const { data: userData } = await supabase.auth.getUser();
@@ -249,7 +250,7 @@ export default function ProjectDetail() {
       } as any);
       if (error) throw error;
       await supabase.from("projects").update({ status: "planning" }).eq("id", project.id);
-      const label = mode === "ai" ? "AI" : providerStatus === "fallback" ? "mock (fallback)" : "mock";
+      const label = mode === "ai" ? "AI" : providerStatus === "fallback" ? "本地规则引擎 (AI 回退)" : "本地规则引擎";
       toast.success(`已生成 v${nextVersion} 服装总表(${label})`);
       setGenerationNotice(null);
       load();
@@ -468,7 +469,7 @@ export default function ProjectDetail() {
                     {snapshots.map((s) => (
                       <tr key={s.id}>
                         <td className="font-mono">v{s.version}</td>
-                        <td><ToneBadge tone="info">{s.mode}</ToneBadge></td>
+                        <td><ToneBadge tone="info">{formatPlanMode(s.mode)}</ToneBadge></td>
                         <td className="font-mono text-xs text-muted-foreground">{new Date(s.generated_at).toLocaleString("zh-CN", { hour12: false })}</td>
                         <td className="font-mono">¥ {s.costume_plan?.totalEstimate ?? "—"}</td>
                       </tr>
@@ -478,7 +479,7 @@ export default function ProjectDetail() {
               </div>
               <MobileCardList>
                 {snapshots.map((s) => (
-                  <MobileCard key={s.id} title={<span className="font-mono">v{s.version}</span>} right={<ToneBadge tone="info">{s.mode}</ToneBadge>}>
+                  <MobileCard key={s.id} title={<span className="font-mono">v{s.version}</span>} right={<ToneBadge tone="info">{formatPlanMode(s.mode)}</ToneBadge>}>
                     <MobileField label="生成时间" value={new Date(s.generated_at).toLocaleString("zh-CN", { hour12: false })} mono />
                     <MobileField label="合计" value={`¥ ${s.costume_plan?.totalEstimate ?? "—"}`} mono />
                   </MobileCard>
@@ -783,7 +784,7 @@ function PlanView({ snapshot, ctx, procurementOn }: { snapshot: Snapshot; ctx: M
       <div className="panel">
         <div className="panel-header">
           <h3 className="text-sm font-semibold">总额估算</h3>
-          <ToneBadge tone="muted">v{snapshot.version} · {snapshot.mode}</ToneBadge>
+          <ToneBadge tone="muted">v{snapshot.version} · {formatPlanMode(snapshot.mode)}</ToneBadge>
         </div>
         <div className="panel-body flex items-baseline gap-3">
           <div className="text-2xl font-semibold tabular-nums">¥ {plan.totalEstimate?.toLocaleString?.() ?? plan.totalEstimate}</div>

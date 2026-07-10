@@ -29,7 +29,7 @@ export default function Modules() {
     <div className="p-4 md:p-6 space-y-4 max-w-5xl">
       <div>
         <h1 className="text-xl font-semibold">模块注册表</h1>
-        <p className="text-sm text-muted-foreground">StageOS 模块与路由清单。v1 默认 mock 模式,可预留 apiBaseUrl。</p>
+        <p className="text-sm text-muted-foreground">StageOS 模块与路由清单。v1 默认本地规则模式,可预留 apiBaseUrl。</p>
       </div>
 
       <div className="panel">
@@ -38,7 +38,7 @@ export default function Modules() {
           <div className="space-y-1.5">
             <Label className="text-xs text-muted-foreground">apiMode</Label>
             <select className="h-9 w-full rounded border bg-background px-2 text-sm" value={apiMode} onChange={(e) => setApiMode(e.target.value)}>
-              <option value="mock">mock (默认)</option>
+              <option value="mock">本地规则引擎 (默认)</option>
               <option value="api">api (预留)</option>
             </select>
           </div>
@@ -61,7 +61,7 @@ export default function Modules() {
                 <h3 className="text-sm font-semibold">{m.group}</h3>
                 <div className="text-xs text-muted-foreground">{m.desc}</div>
               </div>
-              <ToneBadge tone="info">mock</ToneBadge>
+              <ToneBadge tone="info">本地规则</ToneBadge>
             </div>
             <div className="panel-body flex flex-wrap gap-1.5">
               {m.routes.map((r) => <span key={r} className="kbd-route">{r}</span>)}
