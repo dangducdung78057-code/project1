@@ -2,6 +2,7 @@
 // Never throws; missing sections show a placeholder.
 
 import { PROGRAM_TYPES, SCHOOL_STAGES, STAGEOS_VERSION } from "@/lib/stageos";
+import { formatPlanMode } from "@/lib/planMode";
 
 const MISSING = "_（本快照缺少此字段）_";
 const HTML_MISSING = "（本快照缺少此字段）";
@@ -55,7 +56,7 @@ export function localizeEnumsInText(text: string): string {
 export function slug(s: string | undefined | null, fallback = "project"): string {
   if (!s) return fallback;
   const cleaned = s
-    .replace(/[\s\/\\:*?"<>|]+/g, "-")
+    .replace(/[\s/\\:*?"<>|]+/g, "-")
     .replace(/-+/g, "-")
     .replace(/^-|-$/g, "")
     .trim();
@@ -653,7 +654,7 @@ function buildPrintableDoc(data: any, rawPayload: unknown, format: string, meta:
   const maleCount = value(input.maleCount, input.male_count, project.maleCount, project.male_count, md.input?.maleCount, "—");
   const femaleCount = value(input.femaleCount, input.female_count, project.femaleCount, project.female_count, md.input?.femaleCount, "—");
   const budget = value(input.perPersonBudget, input.per_person_budget, project.budget, plan.budget, md.input?.perPersonBudget, "—");
-  const mode = value(snapshot.mode, data?.mode, md.snapshot?.mode, format === "json" ? "mock" : "markdown/mock", "mock");
+  const mode = formatPlanMode(value(snapshot.mode, data?.mode, md.snapshot?.mode, "local"));
   const risks = firstNonEmpty(arrayOf(data?.risks, snapshot?.risks, plan?.risks), md.risks);
   const planB = firstNonEmpty(arrayOf(data?.planB, data?.plan_b, plan?.planB, plan?.plan_b, snapshot?.planB, snapshot?.plan_b), md.planB);
   const purchaseStrategy = firstNonEmpty(arrayOf(plan?.purchaseStrategy, plan?.purchase_strategy, data?.purchaseStrategy, data?.purchase_strategy), md.purchaseStrategy);
@@ -787,7 +788,7 @@ function parseMarkdownPayload(raw: string): {
   // ## 倒排 → "- D-{days} {date} · {task} · {owner}"
   const schedBlock = extractListBlock(raw, /^##\s+倒排\s*$/m);
   for (const item of schedBlock) {
-    const m = /^D-(\d+)\s*([\d\-\/]+)?\s*·\s*(.+?)\s*·\s*(.+)$/.exec(item);
+    const m = /^D-(\d+)\s*([\d\-/]+)?\s*·\s*(.+?)\s*·\s*(.+)$/.exec(item);
     if (m) schedule.push({ daysBefore: Number(m[1]), date: m[2] || "", task: m[3], owner: m[4] });
     else schedule.push(item);
   }

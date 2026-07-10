@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { NavLink } from "react-router-dom";
-import { LayoutDashboard, FolderKanban, Package, Download, Settings as SettingsIcon, Layers, Menu, LogOut } from "lucide-react";
+import { LayoutDashboard, FolderKanban, Package, Download, Settings as SettingsIcon, Layers, Menu, LogOut, Grid3x3 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,7 @@ import { toast } from "sonner";
 const nav = [
   { to: "/", label: "工作台", icon: LayoutDashboard, route: "/workspace" },
   { to: "/projects", label: "项目", icon: FolderKanban, route: "/projects" },
+  { to: "/stage-editor", label: "队形编辑器", icon: Grid3x3, route: "/stage-editor" },
   { to: "/modules", label: "模块注册表", icon: Layers, route: "/modules" },
   { to: "/exports", label: "导出记录", icon: Download, route: "/exports" },
   { to: "/settings", label: "设置", icon: SettingsIcon, route: "/settings" },
@@ -87,7 +88,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <span className="text-muted-foreground hidden sm:inline">/</span>
           <span className="font-medium truncate">运营工作台</span>
           <div className="ml-auto flex items-center gap-2 text-muted-foreground text-xs">
-            <span className="kbd-route hidden md:inline">mode: mock</span>
+            <span className="kbd-route hidden md:inline">engine: 本地规则</span>
             <span className="kbd-route hidden lg:inline">auth: enabled</span>
             <span className="hidden sm:inline font-mono truncate max-w-[160px]" title={user?.email ?? ""}>{user?.email}</span>
             <Button variant="ghost" size="sm" className="h-7 px-2" onClick={doSignOut} title="退出登录" aria-label="退出登录">

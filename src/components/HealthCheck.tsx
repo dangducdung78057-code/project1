@@ -60,7 +60,7 @@ export function HealthCheck() {
       .limit(10);
     setRecent((data ?? []) as RunRow[]);
   }
-  useEffect(() => { void loadRecent(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [user?.id]);
+  useEffect(() => { void loadRecent();   }, [user?.id]);
 
   async function run() {
     setRunning(true);
@@ -448,7 +448,7 @@ export function HealthCheck() {
     //   AI_* 错误码     → warn（会走 fallback，不污染 baseline）
     //   完全不可达/异常 → warn（fallback 仍可用，不判 fail）
     if (!getFlag("aiProvider")) {
-      push({ id: "ai", label: "AI provider (ai-generate-plan)", status: "skip", detail: "flag off (mock 主流程生效)" });
+      push({ id: "ai", label: "AI provider (ai-generate-plan)", status: "skip", detail: "flag off (本地规则引擎主流程生效)" });
     } else {
       try {
         const { result, ms } = await timed(async () => await (
@@ -462,14 +462,14 @@ export function HealthCheck() {
         } else if (code && reachableCodes.has(code)) {
           push({ id: "ai", label: "AI provider (ai-generate-plan)", status: "pass", detail: `可达 (业务拒绝: ${code})`, ms });
         } else if (code && code.startsWith("AI_")) {
-          push({ id: "ai", label: "AI provider (ai-generate-plan)", status: "warn", detail: `AI 不可用，将 fallback mock (${code})`, ms });
+          push({ id: "ai", label: "AI provider (ai-generate-plan)", status: "warn", detail: `AI 不可用，将回退本地规则引擎 (${code})`, ms });
         } else if (result.error) {
-          push({ id: "ai", label: "AI provider (ai-generate-plan)", status: "warn", detail: `边缘函数异常，将 fallback mock (${String(result.error.message ?? "").slice(0, 80)})`, ms });
+          push({ id: "ai", label: "AI provider (ai-generate-plan)", status: "warn", detail: `边缘函数异常，将回退本地规则引擎 (${String(result.error.message ?? "").slice(0, 80)})`, ms });
         } else {
-          push({ id: "ai", label: "AI provider (ai-generate-plan)", status: "warn", detail: "响应异常，将 fallback mock", ms });
+          push({ id: "ai", label: "AI provider (ai-generate-plan)", status: "warn", detail: "响应异常，将回退本地规则引擎", ms });
         }
       } catch (e: any) {
-        push({ id: "ai", label: "AI provider (ai-generate-plan)", status: "warn", detail: `调用异常，将 fallback mock: ${e?.message ?? "unknown"}` });
+        push({ id: "ai", label: "AI provider (ai-generate-plan)", status: "warn", detail: `调用异常，将回退本地规则引擎: ${e?.message ?? "unknown"}` });
       }
     }
 
@@ -488,7 +488,7 @@ export function HealthCheck() {
             { programType: "chorus", schoolStage: "primary" },
           );
           if (!Array.isArray(sample) || sample.length === 0) {
-            push({ id: "procurement", label: "采购候选商品 v1 (本地目录)", status: "warn", detail: "匹配返回空结果" });
+            push({ id: "procurement", label: "采购候选商��� v1 (本地目录)", status: "warn", detail: "匹配返回空结果" });
           } else {
             const c = sample[0];
             const ok = !!(c.platform && c.title && c.keyword && typeof c.estimatedPrice === "number" && c.matchReason && c.riskNote);
@@ -778,7 +778,7 @@ export function HealthCheck() {
       toast.success("验收摘要已复制到剪贴板");
     } catch {
       toast.error("复制失败，请手动选择文本");
-      // eslint-disable-next-line no-console
+       
       console.log(text);
     }
   }

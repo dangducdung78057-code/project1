@@ -20,7 +20,9 @@ export class RootErrorBoundary extends Component<{ children: ReactNode }, State>
       Object.keys(localStorage)
         .filter((k) => k.startsWith("sb-") || k.startsWith("stageos"))
         .forEach((k) => localStorage.removeItem(k));
-    } catch {}
+    } catch {
+      // localStorage 不可用（隐私模式等）时忽略，仍执行跳转
+    }
     window.location.href = "/auth";
   };
 

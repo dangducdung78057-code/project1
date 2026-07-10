@@ -11,11 +11,15 @@ import { resolve } from "node:path";
 import pg from "pg";
 
 function loadEnv() {
-  let url = process.env.POSTGRES_URL_NON_POOLING;
+  // STAGEOS_POSTGRES_URL 优先：市场集成会把失效旧项目的 POSTGRES_URL_NON_POOLING 同步回来，
+  // 专用变量名可避免被覆盖。
+  let url = process.env.STAGEOS_POSTGRES_URL || process.env.POSTGRES_URL_NON_POOLING;
   if (!url) {
     const envText = readFileSync(resolve(process.cwd(), ".env.development.local"), "utf8");
-    const match = envText.match(/^POSTGRES_URL_NON_POOLING="?([^"\n]+)"?$/m);
-    if (!match) throw new Error("POSTGRES_URL_NON_POOLING not found");
+    const match =
+      envText.match(/^STAGEOS_POSTGRES_URL="?([^"\n]+)"?$/m) ??
+      envText.match(/^POSTGRES_URL_NON_POOLING="?([^"\n]+)"?$/m);
+    if (!match) throw new Error("STAGEOS_POSTGRES_URL / POSTGRES_URL_NON_POOLING not found");
     url = match[1];
   }
   // Strip sslmode from the URL so it doesn't override our ssl config below

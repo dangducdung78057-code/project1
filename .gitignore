@@ -8,3 +8,10 @@ node_modules
 .next/
 .env*.local
 .DS_Store
+.vercel
+.env.development.local
+
+# Build outputs (never commit)
+dist/
+.vite/
+*.tsbuildinfo
