@@ -1,0 +1,553 @@
+import { useEffect, useState } from "react";
+import { useNavigate, useParams, Link } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  SCHOOL_STAGES, PROGRAM_TYPES, REHEARSAL_FREQUENCIES,
+  validateStageInputDetailed, appendValidationHistory, type StageInputData,
+} from "@/lib/stageos";
+import {
+  FIELD_HINT_KEYWORDS, buildFieldHints, findUnmatched,
+} from "@/lib/validationHintKeywords";
+import { retrieveStageKnowledge, resolveColorHex } from "@/lib/stageKnowledge";
+import { PresetPaletteSuggestions } from "@/components/PresetPaletteSuggestions";
+import { toast } from "sonner";
+import { Plus, Trash2, ArrowLeft, AlertTriangle, AlertCircle } from "lucide-react";
+
+type Student = NonNullable<StageInputData["students"]>[number];
+
+export default function ProjectEditor() {
+  const { id } = useParams();
+  const isEdit = Boolean(id);
+  const navigate = useNavigate();
+  const [title, setTitle] = useState("");
+  const [status, setStatus] = useState("draft");
+  const [data, setData] = useState<StageInputData>({ rehearsalFrequencyPerWeek: 3 });
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!id) return;
+    (async () => {
+      const { data: p } = await supabase.from("projects").select("*").eq("id", id).maybeSingle();
+      const { data: si } = await supabase.from("stage_inputs").select("data").eq("project_id", id).maybeSingle();
+      if (p) { setTitle(p.title); setStatus(p.status); }
+      if (si?.data) setData(si.data as StageInputData);
+    })();
+  }, [id]);
+
+  // 从确认弹窗跳转过来时,给一次性引导 toast。
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("from") !== "confirm") return;
+    toast.info("已定位到问题字段,修正后点右上「返回确认」重新校验。", { duration: 4000 });
+  }, []);
+
+  const { errors, warnings } = validateStageInputDetailed(data);
+
+  // 知识库检索:按节目类型+人数推荐队形模板(与 AI 生成/mock 共用同一语料)。
+  const formationKnowledge = retrieveStageKnowledge({
+    programType: data.programType,
+    performerCount: data.performerCount,
+    screenThemeColor: data.screenThemeColor,
+    programTheme: data.programTheme,
+  });
+  // 主题色实时预览:HEX 直接渲染,中文色名经知识库色表解析为精确 HEX。
+  const themeColorHex = resolveColorHex(data.screenThemeColor);
+
+  // 字段级联动提示:关键词配置集中在 @/lib/validationHintKeywords。
+  const hints = buildFieldHints({ errors, warnings });
+
+  // 调试模式:URL ?debug=hints 或 localStorage 键 "stageos:debug-hints" = "1"
+  const debugHints =
+    typeof window !== "undefined" &&
+    (new URLSearchParams(window.location.search).get("debug") === "hints" ||
+      window.localStorage.getItem("stageos:debug-hints") === "1");
+
+  const unmatched = findUnmatched({ errors, warnings });
+
+  useEffect(() => {
+    if (!debugHints) return;
+    // eslint-disable-next-line no-console
+    console.groupCollapsed(
+      `[StageOS hints] errors=${errors.length} warnings=${warnings.length} unmatched=${unmatched.errors.length + unmatched.warnings.length}`,
+    );
+    console.table(
+      Object.entries(hints).map(([field, h]) => ({
+        field,
+        errors: h.errors.length,
+        warnings: h.warnings.length,
+      })),
+    );
+    if (unmatched.errors.length || unmatched.warnings.length) {
+      console.warn("[StageOS hints] unmatched", unmatched);
+    }
+    console.groupEnd();
+  }, [debugHints, errors, warnings]);
+
+  // 支持通过 URL hash (#field-xxx) 从确认弹窗定位到具体字段:滚动 + 分阶段高亮。
+  useEffect(() => {
+    const applyHash = () => {
+      const h = window.location.hash;
+      if (!h.startsWith("#field-")) return;
+      const tryScroll = (retries: number) => {
+        const el = document.getElementById(h.slice(1));
+        if (!el) { if (retries > 0) setTimeout(() => tryScroll(retries - 1), 120); return; }
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+        const input = el.querySelector("input,select,textarea") as HTMLElement | null;
+        // 阶段 1(0-900ms):脉冲 + 背景闪烁,吸引注意力。
+        const pulse = ["ring-2", "ring-destructive", "ring-offset-2", "ring-offset-background",
+          "bg-destructive/10", "rounded-md", "animate-pulse", "transition-all", "duration-500"];
+        const steady = ["ring-2", "ring-destructive/60", "ring-offset-2", "ring-offset-background",
+          "rounded-md", "transition-all", "duration-1000"];
+        el.classList.add(...pulse);
+        setTimeout(() => input?.focus({ preventScroll: true }), 350);
+        setTimeout(() => {
+          el.classList.remove(...pulse);
+          el.classList.add(...steady);
+        }, 900);
+        // 阶段 2(900-2900ms):稳定环,再 fade。
+        setTimeout(() => {
+          el.classList.remove(...steady);
+          // 清掉 hash,避免刷新反复触发。
+          history.replaceState(null, "", window.location.pathname + window.location.search);
+        }, 2900);
+      };
+      tryScroll(10);
+    };
+    applyHash();
+    window.addEventListener("hashchange", applyHash);
+    return () => window.removeEventListener("hashchange", applyHash);
+  }, [data]);
+
+
+
+
+  const set = <K extends keyof StageInputData>(k: K, v: StageInputData[K]) =>
+    setData((d) => ({ ...d, [k]: v }));
+
+  const updateStudent = (idx: number, patch: Partial<Student>) => {
+    setData((d) => {
+      const arr = [...(d.students ?? [])];
+      arr[idx] = { ...arr[idx], ...patch };
+      return { ...d, students: arr };
+    });
+  };
+  const addStudent = () => setData((d) => ({
+    ...d,
+    students: [...(d.students ?? []), { studentId: `S${String((d.students?.length ?? 0) + 1).padStart(3, "0")}`, gender: "female", heightCm: 160 }],
+  }));
+  const removeStudent = (idx: number) =>
+    setData((d) => ({ ...d, students: (d.students ?? []).filter((_, i) => i !== idx) }));
+
+  async function save() {
+    if (!title.trim()) { toast.error("请填写项目标题"); return; }
+    if (errors.length > 0) {
+      toast.error(`存在 ${errors.length} 项校验错误,请先修正`);
+      return;
+    }
+    setSaving(true);
+    try {
+      const { data: userData } = await supabase.auth.getUser();
+      const uid = userData.user?.id;
+      if (!uid) { toast.error("未登录"); setSaving(false); return; }
+      let projectId = id;
+      const validationSnapshot = {
+        checkedAt: new Date().toISOString(),
+        errors,
+        warnings,
+      };
+      // Load previous stage_inputs so we can append to __validationHistory instead of overwriting.
+      let prevData: StageInputData | null = null;
+      if (isEdit && id) {
+        const { data: prev } = await supabase.from("stage_inputs").select("data").eq("project_id", id).maybeSingle();
+        prevData = (prev?.data as StageInputData) ?? null;
+      }
+      const persistedData = appendValidationHistory(prevData ?? data, validationSnapshot);
+      if (isEdit && id) {
+        await supabase.from("projects").update({
+          title, status,
+          performance_date: data.performanceDate || null,
+          performer_count: data.performerCount ?? null,
+        }).eq("id", id);
+      } else {
+        const { data: created, error } = await supabase.from("projects").insert({
+          title, status, user_id: uid,
+          performance_date: data.performanceDate || null,
+          performer_count: data.performerCount ?? null,
+        } as any).select().single();
+        if (error) throw error;
+        projectId = created.id;
+      }
+      await supabase.from("stage_inputs").upsert({ project_id: projectId!, user_id: uid, data: persistedData as any } as any);
+      toast.success(isEdit ? "已更新" : "已创建");
+      navigate(`/projects/${projectId}`);
+    } catch (e: any) {
+      toast.error("保存失败:" + e.message);
+    } finally { setSaving(false); }
+  }
+
+  return (
+    <div className="p-6 space-y-5 max-w-5xl">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Button asChild variant="ghost" size="sm"><Link to="/projects"><ArrowLeft className="h-4 w-4 mr-1" />返回</Link></Button>
+          <h1 className="text-xl font-semibold">{isEdit ? "编辑项目" : "新建项目"}</h1>
+          <span className="kbd-route">{isEdit ? "PUT /projects/:id" : "POST /projects"}</span>
+        </div>
+        <div className="flex items-center gap-2">
+          {typeof window !== "undefined" && new URLSearchParams(window.location.search).get("from") === "confirm" && id && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => navigate(`/projects/${id}?confirm=1`)}
+              title="回到确认弹窗并重新校验"
+            >
+              <ArrowLeft className="h-4 w-4 mr-1" />返回确认
+            </Button>
+          )}
+          <Button size="sm" onClick={save} disabled={saving || errors.length > 0}>{saving ? "保存中…" : errors.length > 0 ? `修正 ${errors.length} 项错误` : "保存项目"}</Button>
+        </div>
+      </div>
+
+      {errors.length > 0 && (
+        <div className="panel border-destructive/40 bg-destructive/5">
+          <div className="panel-body flex items-start gap-2 text-sm">
+            <AlertCircle className="h-4 w-4 text-destructive mt-0.5" />
+            <div>
+              <div className="font-medium text-destructive">校验错误(阻止保存)</div>
+              <ul className="mt-1 list-disc list-inside text-muted-foreground text-xs space-y-0.5">
+                {errors.map((i) => <li key={i}>{i}</li>)}
+              </ul>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {warnings.length > 0 && (
+        <div className="panel border-warning/40 bg-warning/5">
+          <div className="panel-body flex items-start gap-2 text-sm">
+            <AlertTriangle className="h-4 w-4 text-warning mt-0.5" />
+            <div>
+              <div className="font-medium text-warning">数据校验提示</div>
+              <ul className="mt-1 list-disc list-inside text-muted-foreground text-xs space-y-0.5">
+                {warnings.map((i) => <li key={i}>{i}</li>)}
+              </ul>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {debugHints && (
+        <div className="panel border-info/40 bg-info/5">
+          <div className="panel-header">
+            <h2 className="text-sm font-semibold text-info">联动提示调试</h2>
+            <span className="text-[11px] text-muted-foreground font-mono">
+              ?debug=hints · errors={errors.length} warnings={warnings.length}
+            </span>
+          </div>
+          <div className="panel-body space-y-2 text-xs">
+            <table className="ops-table">
+              <thead>
+                <tr><th>字段</th><th className="w-16 text-right">errors</th><th className="w-16 text-right">warnings</th><th>关键词</th></tr>
+              </thead>
+              <tbody>
+                {Object.entries(hints).map(([field, h]) => (
+                  <tr key={field}>
+                    <td className="font-mono">{field}</td>
+                    <td className="text-right font-mono">{h.errors.length}</td>
+                    <td className="text-right font-mono">{h.warnings.length}</td>
+                    <td className="font-mono text-[11px] text-muted-foreground">{(FIELD_HINT_KEYWORDS as Record<string, readonly string[]>)[field].join(" | ")}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {(unmatched.errors.length > 0 || unmatched.warnings.length > 0) && (
+              <div className="rounded border border-destructive/40 bg-destructive/5 p-2">
+                <div className="font-medium text-destructive mb-1">未匹配到任何字段的信息(需扩充关键词)</div>
+                <ul className="list-disc list-inside space-y-0.5">
+                  {unmatched.errors.map((m) => <li key={`ue-${m}`} className="text-destructive">错误:{m}</li>)}
+                  {unmatched.warnings.map((m) => <li key={`uw-${m}`} className="text-warning">提示:{m}</li>)}
+                </ul>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+
+
+      <div className="panel">
+        <div className="panel-header"><h2 className="text-sm font-semibold">基本信息</h2></div>
+        <div className="panel-body grid grid-cols-2 gap-4">
+          <Field label="项目标题" required>
+            <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="如:2026 春季合唱汇演 · 高一 3 班" />
+          </Field>
+          <Field label="学段">
+            <Select value={data.schoolStage} onValueChange={(v) => set("schoolStage", v)}>
+              <SelectTrigger><SelectValue placeholder="选择学段" /></SelectTrigger>
+              <SelectContent>{SCHOOL_STAGES.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}</SelectContent>
+            </Select>
+          </Field>
+          <Field label="节目类型 programType">
+            <Select value={data.programType} onValueChange={(v) => set("programType", v)}>
+              <SelectTrigger><SelectValue placeholder="选择节目类型" /></SelectTrigger>
+              <SelectContent className="max-h-72">{PROGRAM_TYPES.map((s) => <SelectItem key={s.value} value={s.value}>{s.label} · <span className="font-mono text-xs text-muted-foreground">{s.value}</span></SelectItem>)}</SelectContent>
+            </Select>
+          </Field>
+          <Field label="节目主题">
+            <Input value={data.programTheme ?? ""} onChange={(e) => set("programTheme", e.target.value)} placeholder="programTheme" />
+          </Field>
+          <Field label="场地类型">
+            <Input value={data.venueType ?? ""} onChange={(e) => set("venueType", e.target.value)} placeholder="室内剧场 / 露天舞台 …" />
+          </Field>
+          <Field label="演出日期">
+            <Input type="date" value={data.performanceDate ?? ""} onChange={(e) => set("performanceDate", e.target.value)} />
+          </Field>
+          <Field label="彩排频次(次/周)" hint={hints.rehearsal} field="rehearsalFrequencyPerWeek">
+            <Select value={String(data.rehearsalFrequencyPerWeek ?? "")} onValueChange={(v) => set("rehearsalFrequencyPerWeek", Number(v) as 2|3|5)}>
+              <SelectTrigger><SelectValue placeholder="选择彩排频次" /></SelectTrigger>
+              <SelectContent>{REHEARSAL_FREQUENCIES.map((n) => <SelectItem key={n} value={String(n)}>{n} 次/周</SelectItem>)}</SelectContent>
+            </Select>
+          </Field>
+          <Field label="项目状态">
+            <Select value={status} onValueChange={setStatus}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="draft">草稿</SelectItem>
+                <SelectItem value="planning">排产中</SelectItem>
+                <SelectItem value="needs_revision">待修订</SelectItem>
+                <SelectItem value="confirmed">已确认</SelectItem>
+                <SelectItem value="exported">已导出</SelectItem>
+              </SelectContent>
+            </Select>
+          </Field>
+        </div>
+      </div>
+
+      <div className="panel">
+        <div className="panel-header"><h2 className="text-sm font-semibold">人数与预算</h2></div>
+        <div className="panel-body grid grid-cols-4 gap-4">
+          <Field label="总人数 performerCount" hint={hints.performerCount} field="performerCount">
+            <Input type="number" value={data.performerCount ?? ""} onChange={(e) => set("performerCount", e.target.value ? Number(e.target.value) : undefined)} />
+          </Field>
+          <Field label="男生数 maleCount" hint={hints.maleCount} field="maleCount">
+            <Input type="number" value={data.maleCount ?? ""} onChange={(e) => set("maleCount", e.target.value ? Number(e.target.value) : undefined)} />
+          </Field>
+          <Field label="女生数 femaleCount" hint={hints.femaleCount} field="femaleCount">
+            <Input type="number" value={data.femaleCount ?? ""} onChange={(e) => set("femaleCount", e.target.value ? Number(e.target.value) : undefined)} />
+          </Field>
+          <Field label="人均预算 (元)" hint={hints.perPersonBudget} field="perPersonBudget">
+            <Input type="number" value={data.perPersonBudget ?? ""} onChange={(e) => set("perPersonBudget", e.target.value ? Number(e.target.value) : undefined)} />
+          </Field>
+        </div>
+      </div>
+
+
+      <div className="panel">
+        <div className="panel-header"><h2 className="text-sm font-semibold">视觉与期待</h2></div>
+        <div className="panel-body grid grid-cols-2 gap-4">
+          <Field label="屏幕主题色 screenThemeColor">
+            <div className="flex items-center gap-2">
+              <Input value={data.screenThemeColor ?? ""} onChange={(e) => set("screenThemeColor", e.target.value)} placeholder="如:靛蓝 / #1E3A8A" />
+              {themeColorHex ? (
+                <span
+                  aria-label={`主题色预览 ${themeColorHex}`}
+                  title={themeColorHex}
+                  className="inline-block h-8 w-8 shrink-0 rounded border border-border"
+                  style={{ backgroundColor: themeColorHex }}
+                />
+              ) : null}
+            </div>
+          </Field>
+          <Field label="灯光风格 lightingStyle">
+            <Input value={data.lightingStyle ?? ""} onChange={(e) => set("lightingStyle", e.target.value)} placeholder="如:暖调聚光 / 冷色氛围" />
+          </Field>
+          <div className="col-span-2">
+            <Field label={`知识库配色推荐(${formationKnowledge.archetype},点击套用主色)`}>
+              <div className="flex flex-wrap gap-2">
+                {formationKnowledge.palettes.map((p) => (
+                  <button
+                    key={p.name}
+                    type="button"
+                    className="flex items-center gap-2 rounded border border-border px-2 py-1.5 text-xs hover:bg-accent"
+                    title={`${p.note} 主色 ${p.primary} ${p.primaryHex} / 辅色 ${p.secondary} ${p.secondaryHex} / 点缀 ${p.accent} ${p.accentHex}`}
+                    onClick={() => {
+                      set("screenThemeColor", `${p.primary} ${p.primaryHex}`);
+                      toast.success(`已套用配色「${p.name}」主色 ${p.primary} ${p.primaryHex}`);
+                    }}
+                  >
+                    <span className="flex overflow-hidden rounded border border-border">
+                      <span className="h-4 w-4" style={{ backgroundColor: p.primaryHex }} />
+                      <span className="h-4 w-4" style={{ backgroundColor: p.secondaryHex }} />
+                      <span className="h-4 w-4" style={{ backgroundColor: p.accentHex }} />
+                    </span>
+                    {p.name}
+                  </button>
+                ))}
+              </div>
+            </Field>
+          </div>
+          <div className="col-span-2">
+            <Field label="中国传统色方案推荐(853 色库 · 70 套节目方案,点击套用主色)">
+              <PresetPaletteSuggestions
+                programType={data.programType}
+                programTheme={data.programTheme}
+                onApply={(colorText, presetName) => {
+                  set("screenThemeColor", colorText);
+                  toast.success(`已套用传统色方案「${presetName}」主色 ${colorText}`);
+                }}
+              />
+            </Field>
+          </div>
+          <div className="col-span-2">
+            <Field label="特殊期待 specialExpectation">
+              <Textarea rows={2} value={data.specialExpectation ?? ""} onChange={(e) => set("specialExpectation", e.target.value)} />
+            </Field>
+          </div>
+        </div>
+      </div>
+
+      <div className="panel">
+        <div className="panel-header">
+          <div className="flex items-center gap-2">
+            <h2 className="text-sm font-semibold">已确认队形 confirmedFormation</h2>
+            <span className="text-xs text-muted-foreground">用于渲染上下文</span>
+          </div>
+        </div>
+        <div className="panel-body space-y-4">
+          <Field label={`知识库队形推荐(${formationKnowledge.archetype} 专属 + 通用队形池)`}>
+            <Select
+              value=""
+              onValueChange={(name) => {
+                const f = formationKnowledge.formations.find((t) => t.name === name);
+                if (!f) return;
+                setData((d) => ({
+                  ...d,
+                  confirmedFormation: {
+                    summary: f.summary,
+                    rows: f.rows,
+                    layoutName: f.name,
+                    spacingRule: f.spacingRule,
+                  },
+                }));
+                toast.success(`已套用${f.universal ? "通用" : "专属"}队形模板「${f.name}」,可在下方微调。`);
+              }}
+            >
+              <SelectTrigger><SelectValue placeholder="按节目类型与人数选择队形模板,自动填入下方字段" /></SelectTrigger>
+              <SelectContent>
+                {formationKnowledge.formations.map((f) => (
+                  <SelectItem key={f.name} value={f.name}>
+                    {f.universal ? "〔通用〕" : `〔${formationKnowledge.archetype}〕`}{f.name} · {f.rows} 行 · 适用 {f.countRange[0]}-{f.countRange[1]} 人
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </Field>
+          <div className="grid grid-cols-2 gap-4">
+          <Field label="队形摘要 summary">
+            <Input value={data.confirmedFormation?.summary ?? ""} onChange={(e) => setData((d) => ({ ...d, confirmedFormation: { ...d.confirmedFormation, summary: e.target.value } }))} />
+          </Field>
+          <Field label="行数 rows">
+            <Input type="number" value={data.confirmedFormation?.rows ?? ""} onChange={(e) => setData((d) => ({ ...d, confirmedFormation: { ...d.confirmedFormation, rows: Number(e.target.value) || undefined } }))} />
+          </Field>
+          <Field label="布局名 layoutName">
+            <Input value={data.confirmedFormation?.layoutName ?? ""} onChange={(e) => setData((d) => ({ ...d, confirmedFormation: { ...d.confirmedFormation, layoutName: e.target.value } }))} />
+          </Field>
+          <Field label="间距规则 spacingRule">
+            <Input value={data.confirmedFormation?.spacingRule ?? ""} onChange={(e) => setData((d) => ({ ...d, confirmedFormation: { ...d.confirmedFormation, spacingRule: e.target.value } }))} />
+          </Field>
+          </div>
+        </div>
+      </div>
+
+      <div className="panel scroll-mt-24" id="field-students" data-field="students">
+        <div className="panel-header">
+          <div className="flex items-center gap-2">
+            <h2 className="text-sm font-semibold">学生名录(匿名)</h2>
+            <span className="text-xs text-muted-foreground">仅使用 studentId,不采集真实姓名。</span>
+          </div>
+          <Button variant="outline" size="sm" onClick={addStudent}><Plus className="h-3.5 w-3.5 mr-1" />添加</Button>
+        </div>
+        {(hints.students.errors.length > 0 || hints.students.warnings.length > 0) && (
+          <div className="px-4 pt-2 space-y-0.5">
+            {hints.students.errors.map((m) => <div key={`se-${m}`} className="text-[11px] text-destructive">• {m}</div>)}
+            {hints.students.warnings.map((m) => <div key={`sw-${m}`} className="text-[11px] text-warning">• {m}</div>)}
+          </div>
+        )}
+        <div className="overflow-x-auto">
+
+          <table className="ops-table">
+            <thead>
+              <tr>
+                <th className="w-32">studentId</th><th className="w-24">gender</th>
+                <th className="w-28">heightCm</th><th>roleLabel(可选)</th><th className="w-12"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {(data.students ?? []).length === 0 && (
+                <tr><td colSpan={5} className="text-center py-6 text-muted-foreground text-sm">
+                  尚未添加。可选:添加匿名学生数据以启用尺码摸底。
+                </td></tr>
+              )}
+              {(data.students ?? []).map((s, i) => (
+                <tr key={i}>
+                  <td><Input className="h-7 font-mono text-xs" value={s.studentId} onChange={(e) => updateStudent(i, { studentId: e.target.value })} /></td>
+                  <td>
+                    <Select value={s.gender} onValueChange={(v) => updateStudent(i, { gender: v as any })}>
+                      <SelectTrigger className="h-7"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="female">女</SelectItem>
+                        <SelectItem value="male">男</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </td>
+                  <td><Input className="h-7 font-mono text-xs" type="number" value={s.heightCm} onChange={(e) => updateStudent(i, { heightCm: Number(e.target.value) })} /></td>
+                  <td><Input className="h-7" value={s.roleLabel ?? ""} onChange={(e) => updateStudent(i, { roleLabel: e.target.value })} placeholder="如:领唱 / 领舞" /></td>
+                  <td><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => removeStudent(i)} aria-label={`删除第 ${i + 1} 行学生`}><Trash2 className="h-3.5 w-3.5" aria-hidden="true" /><span className="sr-only">删除学生</span></Button></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Field({
+  label, required, children, hint, field,
+}: {
+  label: string;
+  required?: boolean;
+  children: React.ReactNode;
+  hint?: { errors: string[]; warnings: string[] };
+  field?: string;
+}) {
+  const hasErr = (hint?.errors.length ?? 0) > 0;
+  const hasWarn = (hint?.warnings.length ?? 0) > 0;
+  return (
+    <div className="space-y-1.5 scroll-mt-24 rounded-sm" id={field ? `field-${field}` : undefined} data-field={field}>
+      <Label className={`text-xs ${hasErr ? "text-destructive" : hasWarn ? "text-warning" : "text-muted-foreground"}`}>
+        {label}{required && <span className="text-destructive ml-0.5">*</span>}
+      </Label>
+      {children}
+      {hasErr && (
+        <ul className="text-[11px] text-destructive space-y-0.5">
+          {hint!.errors.map((m) => <li key={`e-${m}`}>• {m}</li>)}
+        </ul>
+      )}
+      {hasWarn && (
+        <ul className="text-[11px] text-warning space-y-0.5">
+          {hint!.warnings.map((m) => <li key={`w-${m}`}>• {m}</li>)}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+

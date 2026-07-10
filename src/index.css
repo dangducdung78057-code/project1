@@ -1,0 +1,136 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* StageOS operations palette — quiet slate + steel blue accent */
+    --background: 210 20% 98%;
+    --foreground: 215 28% 12%;
+
+    --surface: 0 0% 100%;
+    --surface-muted: 214 24% 96%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 215 28% 12%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 215 28% 12%;
+
+    --primary: 215 65% 32%;
+    --primary-foreground: 210 40% 98%;
+
+    --secondary: 214 24% 93%;
+    --secondary-foreground: 215 30% 20%;
+
+    --muted: 214 20% 94%;
+    --muted-foreground: 215 14% 42%;
+
+    --accent: 199 85% 42%;
+    --accent-foreground: 210 40% 98%;
+
+    --destructive: 0 72% 45%;
+    --destructive-foreground: 210 40% 98%;
+
+    --warning: 32 92% 46%;
+    --warning-foreground: 40 100% 97%;
+
+    --success: 152 58% 34%;
+    --success-foreground: 152 60% 96%;
+
+    --info: 215 65% 42%;
+    --info-foreground: 210 40% 98%;
+
+    --border: 214 20% 88%;
+    --input: 214 20% 88%;
+    --ring: 215 65% 32%;
+
+    --radius: 0.375rem;
+
+    --sidebar-background: 215 30% 14%;
+    --sidebar-foreground: 214 25% 82%;
+    --sidebar-primary: 199 85% 52%;
+    --sidebar-primary-foreground: 215 30% 14%;
+    --sidebar-accent: 215 25% 20%;
+    --sidebar-accent-foreground: 210 40% 98%;
+    --sidebar-border: 215 25% 22%;
+    --sidebar-ring: 199 85% 52%;
+  }
+
+  .dark {
+    --background: 215 30% 8%;
+    --foreground: 210 30% 94%;
+    --surface: 215 28% 11%;
+    --surface-muted: 215 25% 14%;
+    --card: 215 28% 11%;
+    --card-foreground: 210 30% 94%;
+    --popover: 215 28% 11%;
+    --popover-foreground: 210 30% 94%;
+    --primary: 199 85% 52%;
+    --primary-foreground: 215 30% 10%;
+    --secondary: 215 25% 18%;
+    --secondary-foreground: 210 30% 94%;
+    --muted: 215 25% 16%;
+    --muted-foreground: 214 15% 60%;
+    --accent: 199 85% 52%;
+    --accent-foreground: 215 30% 10%;
+    --destructive: 0 65% 48%;
+    --destructive-foreground: 210 40% 98%;
+    --warning: 32 92% 52%;
+    --warning-foreground: 215 30% 10%;
+    --success: 152 55% 45%;
+    --success-foreground: 215 30% 10%;
+    --info: 199 85% 52%;
+    --info-foreground: 215 30% 10%;
+    --border: 215 25% 20%;
+    --input: 215 25% 20%;
+    --ring: 199 85% 52%;
+  }
+}
+
+@layer base {
+  * { @apply border-border; }
+  html, body, #root { height: 100%; }
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC",
+      system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+  .font-mono, code, kbd, samp {
+    font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+}
+
+@layer components {
+  .ops-table { @apply w-full text-sm; }
+  .ops-table thead th {
+    @apply text-left font-medium text-muted-foreground px-3 py-2 border-b bg-surface-muted;
+    font-size: 12px;
+  }
+  .ops-table tbody td { @apply px-3 py-2 border-b align-middle; }
+  .ops-table tbody tr:hover { @apply bg-surface-muted/60; }
+
+  .kbd-route {
+    @apply font-mono text-[11px] px-1.5 py-0.5 rounded bg-surface-muted text-muted-foreground border;
+  }
+
+  .panel {
+    @apply bg-card border rounded-md;
+  }
+  .panel-header {
+    @apply flex items-center justify-between px-4 py-2.5 border-b;
+  }
+  .panel-body { @apply p-4; }
+
+  /* Checkpoint banner — shown once at build-time */
+  .checkpoint-banner::before {
+    content: "CHECKPOINT: stageos-v4.1-webhook-signature";
+    display: block;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 10px;
+    color: hsl(var(--success));
+    padding: 2px 0;
+    opacity: 0.7;
+  }
+}
